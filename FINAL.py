@@ -104,7 +104,7 @@ def get_auto_threshold(predictions, method='otsu'):
 def preprocess_image(image, model_type, resolution_factor=1.0, brightness_factor=0, contrast_factor=0,
                      blur_amount=1, edge_detection=False, flip_horizontal=False, flip_vertical=False,
                      rotate_angle=0):
-    dims = {'sandboil': (512, 512), 'seepage': (256, 256), 'crack': (512, 512)} #change by ayon
+    dims = {'sandboil': (512, 512), 'seepage': (256, 256), 'crack': (256, 256)} #change by ayon
     input_width, input_height = dims.get(model_type, (512, 512))
     
     image_resized = cv2.resize(image, (input_width, input_height))
