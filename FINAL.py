@@ -1,11 +1,12 @@
 import streamlit as st
 import cv2
 import numpy as np
-from tensorflow.keras.models import load_model
 import tensorflow as tf
+from keras.models import load_model
 import tensorflow_addons as tfa
 import gc
 import os
+os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 import time
 from PIL import Image
 import tempfile
@@ -15,7 +16,6 @@ import json
 from streamlit_drawable_canvas import st_canvas
 import pandas as pd
 import time
-
 
 
 # Import custom modules
@@ -62,7 +62,10 @@ def load_model_by_type(model_type):
     model_paths = {
         'sandboil': 'sandboil_best_model.h5',
         'seepage': 'seepage_best_model.h5',
-        'rutting': 'rutting_best_model.h5'
+        'rutting': 'rutting_best_model.h5',
+        'encroachment': 'encroachment_best_model.h5',
+        'animal_burrow': 'burrow_best_model.h5',
+        'crack': 'iterlunet.h5'
         # Add paths for other models here
     }
     if model_type in model_paths:
@@ -101,7 +104,7 @@ def get_auto_threshold(predictions, method='otsu'):
 def preprocess_image(image, model_type, resolution_factor=1.0, brightness_factor=0, contrast_factor=0,
                      blur_amount=1, edge_detection=False, flip_horizontal=False, flip_vertical=False,
                      rotate_angle=0):
-    dims = {'sandboil': (512, 512), 'seepage': (256, 256)}
+    dims = {'sandboil': (512, 512), 'seepage': (256, 256), 'crack': (512, 512)} #change by ayon
     input_width, input_height = dims.get(model_type, (512, 512))
     
     image_resized = cv2.resize(image, (input_width, input_height))
@@ -125,6 +128,10 @@ def preprocess_image(image, model_type, resolution_factor=1.0, brightness_factor
         image = cv2.warpAffine(image, M, (w, h))
     
     return np.expand_dims(image_resized / 255.0, axis=0)
+
+
+
+
 
 # --- Overlap Resolution ---
 def constrained_flood_fill(sandboil_mask, seepage_mask, distance_threshold):
