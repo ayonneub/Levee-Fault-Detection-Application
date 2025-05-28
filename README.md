@@ -11,8 +11,8 @@ Interface:
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/padam56/Levee_Web_Detection.git
-cd Levee_Web_Detection
+git clone https://github.com/ayonneub/Levee-Fault-Detection-Application.git
+cd Levee-Fault-Detection
 ```
 
 ### Install Dependencies
