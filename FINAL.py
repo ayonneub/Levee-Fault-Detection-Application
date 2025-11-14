@@ -24,6 +24,19 @@ st.set_page_config(
     layout="wide",
 )
 
+st.markdown(
+    """
+    <style>
+    /* Reduce main padding a bit */
+    .block-container {
+        padding-top: 1rem;
+        padding-bottom: 1rem;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
 # Import custom modules
 from metrics import (
     mcc_loss, mcc_metric, dice_coef, dice_loss, f1, tversky, tversky_loss,
@@ -379,7 +392,7 @@ with st.sidebar:
         st.session_state['rotate_angle'] = st.slider("Rotate Image (Degrees)", -180, 180, 0)
         st.form_submit_button("Apply Pre-processing")
 
-    # Legend Card
+    # Legend (no forced light background)
     legend_items = []
     for t in detection_types:
         rgb = get_color_for_detection(t)
@@ -392,8 +405,7 @@ with st.sidebar:
         )
 
     legend_html = (
-        "<div style='padding:0.5rem 0.75rem;border-radius:0.5rem;"
-        "border:1px solid #e0e0e0;background-color:#fafafa;'>"
+        "<div style='padding:0.5rem 0.75rem;'>"
         "<b>Legend</b><br>" + "".join(legend_items) + "</div>"
     )
     st.markdown(legend_html, unsafe_allow_html=True)
@@ -499,10 +511,10 @@ with tab_image:
                     [t.capitalize() for t in selected_types]
                 )
 
-                # Controls for annotations
+                # Controls for annotations (no forced light bg)
                 st.markdown(
                     "<div style='padding:0.5rem;border-radius:0.5rem;"
-                    "border:1px solid #e0e0e0;background-color:#fcfcfc;'>",
+                    "border:1px solid #e0e0e0;'>",
                     unsafe_allow_html=True,
                 )
                 c1, c2 = st.columns(2)
