@@ -20,7 +20,7 @@ import time
 # Streamlit page config & basic styling
 st.set_page_config(
     page_title="Levee Fault Detection",
-    page_icon="🌊",
+    page_icon="./images/gulf_scei_logo.png",
     layout="wide",
 )
 
