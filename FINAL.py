@@ -17,10 +17,39 @@ from streamlit_drawable_canvas import st_canvas
 import pandas as pd
 import time
 
-#hello
+# Streamlit page config & basic styling
+st.set_page_config(
+    page_title="Levee Fault Detection",
+    page_icon="🌊",
+    layout="wide",
+)
+
+st.markdown(
+    """
+    <style>
+    /* Sidebar background */
+    [data-testid="stSidebar"] {
+        background-color: #f8f9fa;
+    }
+    /* Reduce main padding a bit */
+    .block-container {
+        padding-top: 1rem;
+        padding-bottom: 1rem;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
 # Import custom modules
-from metrics import mcc_loss, mcc_metric, dice_coef, dice_loss, f1, tversky, tversky_loss, focal_tversky_loss, bce_dice_loss_new, jaccard, bce_dice_loss
-from SandBoilNet import PCALayer, spatial_pooling_block, attention_block, initial_conv2d_bn, conv2d_bn, iterLBlock, decoder_block
+from metrics import (
+    mcc_loss, mcc_metric, dice_coef, dice_loss, f1, tversky, tversky_loss,
+    focal_tversky_loss, bce_dice_loss_new, jaccard, bce_dice_loss
+)
+from SandBoilNet import (
+    PCALayer, spatial_pooling_block, attention_block,
+    initial_conv2d_bn, conv2d_bn, iterLBlock, decoder_block
+)
 
 # --- GPU Management ---
 def enable_memory_growth():
@@ -88,7 +117,14 @@ def otsu_threshold(predictions):
 def adaptive_threshold(predictions, block_size=11, C=2):
     """Apply adaptive thresholding to prediction probabilities."""
     preds_uint8 = (predictions * 255).astype(np.uint8)
-    thresh = cv2.adaptiveThreshold(preds_uint8, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY, block_size, C)
+    thresh = cv2.adaptiveThreshold(
+        preds_uint8,
+        255,
+        cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+        cv2.THRESH_BINARY,
+        block_size,
+        C
+    )
     return thresh / 255.0
 
 def get_auto_threshold(predictions, method='otsu'):
@@ -101,12 +137,21 @@ def get_auto_threshold(predictions, method='otsu'):
 
 # --- Preprocessing ---
 @st.cache_data
-def preprocess_image(image, model_type, resolution_factor=1.0, brightness_factor=0, contrast_factor=0,
-                     blur_amount=1, edge_detection=False, flip_horizontal=False, flip_vertical=False,
-                     rotate_angle=0):
-    dims = {'sandboil': (512, 512), 'seepage': (256, 256), 'crack': (256, 256)} #change by ayon
+def preprocess_image(
+    image,
+    model_type,
+    resolution_factor=1.0,
+    brightness_factor=0,
+    contrast_factor=0,
+    blur_amount=1,
+    edge_detection=False,
+    flip_horizontal=False,
+    flip_vertical=False,
+    rotate_angle=0
+):
+    dims = {'sandboil': (512, 512), 'seepage': (256, 256), 'crack': (256, 256)}  # change by ayon
     input_width, input_height = dims.get(model_type, (512, 512))
-    
+
     image_resized = cv2.resize(image, (input_width, input_height))
     if resolution_factor != 1.0:
         new_width, new_height = int(image.shape[1] * resolution_factor), int(image.shape[0] * resolution_factor)
@@ -126,12 +171,8 @@ def preprocess_image(image, model_type, resolution_factor=1.0, brightness_factor
         h, w = image.shape[:2]
         M = cv2.getRotationMatrix2D((w // 2, h // 2), rotate_angle, 1.0)
         image = cv2.warpAffine(image, M, (w, h))
-    
+
     return np.expand_dims(image_resized / 255.0, axis=0)
-
-
-
-
 
 # --- Overlap Resolution ---
 def constrained_flood_fill(sandboil_mask, seepage_mask, distance_threshold):
@@ -213,14 +254,14 @@ def draw_bounding_boxes(frame, mask, color=(0, 255, 0)):
 
 def get_color_for_detection(detection_type):
     colors = {
-        'sandboil': (0, 255, 0),      # Green
+        'sandboil': (0, 255, 0),        # Green
         'seepage': (255, 105, 180),     # Pink
-        'crack': (0, 0, 255),         # Blue
-        'potholes': (255, 165, 0),    # Orange
-        'encroachment': (255, 0, 0),  # Red
-        'rutting': (128, 0, 128),     # Purple
-        'animal_burrow': (165, 42, 42),  # Brown
-        'vegetation': (0, 100, 0)     # Dark Green
+        'crack': (0, 0, 255),           # Blue
+        'potholes': (255, 165, 0),      # Orange
+        'encroachment': (255, 0, 0),    # Red
+        'rutting': (128, 0, 128),       # Purple
+        'animal_burrow': (165, 42, 42), # Brown
+        'vegetation': (0, 100, 0)       # Dark Green
     }
     return colors.get(detection_type, (255, 255, 255))  # Default white
 
@@ -230,9 +271,11 @@ def process_frame(frame, models, thresholds, threshold_types, detection_choice, 
     # 1) Run inference & threshold each model
     for detection_type, model in models.items():
         preds = apply_model(model, frame, detection_type)
-        thresh = (thresholds[detection_type]
-                  if threshold_types[detection_type] == 'Manual'
-                  else get_auto_threshold(preds, 'otsu'))
+        thresh = (
+            thresholds[detection_type]
+            if threshold_types[detection_type] == 'Manual'
+            else get_auto_threshold(preds, 'otsu')
+        )
         mask = (preds > thresh).astype(np.uint8)
         if detection_type == 'seepage':
             kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
@@ -251,14 +294,13 @@ def process_frame(frame, models, thresholds, threshold_types, detection_choice, 
             boxed_frame = draw_bounding_boxes(boxed_frame, mask, color)
         return boxed_frame, masks
 
-    # 3B) Overlay mode: stack your translucent masks as before
+    # 3B) Overlay mode: stack translucent masks
     combined_overlay = np.zeros_like(frame, dtype=np.uint8)
     for dt, mask in masks.items():
         color = get_color_for_detection(dt)
         overlay = overlay_mask_on_image(frame, mask, overlay_intensity, color)
         combined_overlay = cv2.addWeighted(combined_overlay, 1.0, overlay, 1.0, 0)
     return combined_overlay, masks
-
 
 def apply_model(model, image, model_type):
     processed_image = preprocess_image(
@@ -275,104 +317,183 @@ def apply_model(model, image, model_type):
     predictions = model.predict(processed_image)
     return np.squeeze(predictions)
 
-# --- UI Setup ---
-st.title("Levee Fault Detection WebApp")
+# --- UI Header ---
+st.markdown(
+    """
+    <h1 style="text-align:center; margin-bottom:0.2rem;">
+        🌊 Levee Fault Detection Dashboard
+    </h1>
+    <p style="text-align:center; color:gray; font-size:0.9rem;">
+        Multi-hazard detection on levee imagery (Sandboils, Seepage, Cracks, and more)
+    </p>
+    <hr>
+    """,
+    unsafe_allow_html=True,
+)
 
-# Detection Type Selection
-st.sidebar.write("### Select Detection Types")
-detection_types = {
-    'sandboil': st.sidebar.checkbox("Detect Sandboils"),
-    'seepage': st.sidebar.checkbox("Detect Seepage"),
-    'crack': st.sidebar.checkbox("Detect Crack"),
-    'potholes': st.sidebar.checkbox("Detect Potholes"),
-    'encroachment': st.sidebar.checkbox("Detect Encroachment"),
-    'rutting': st.sidebar.checkbox("Detect Rutting"),
-    'animal_burrow': st.sidebar.checkbox("Detect Animal Burrow"),
-    'vegetation': st.sidebar.checkbox("Detect Vegetation")
-}
-selected_types = [t for t, selected in detection_types.items() if selected]
+# --- SIDEBAR: Controls ---
+with st.sidebar:
+    st.markdown("## ⚙️ Controls")
 
-# Detection Choice
-detection_choice = st.sidebar.radio("Choose Detection Type", ("Overlay", "Bounding Box"))
+    # Detection selection
+    with st.expander("🧪 Detection Types", expanded=True):
+        detection_types = {
+            'sandboil': st.checkbox("Sandboils"),
+            'seepage': st.checkbox("Seepage"),
+            'crack': st.checkbox("Cracks"),
+            'potholes': st.checkbox("Potholes"),
+            'encroachment': st.checkbox("Encroachment"),
+            'rutting': st.checkbox("Rutting"),
+            'animal_burrow': st.checkbox("Animal Burrows"),
+            'vegetation': st.checkbox("Vegetation")
+        }
+    selected_types = [t for t, selected in detection_types.items() if selected]
 
-# Threshold Settings
-st.sidebar.write("### Threshold Settings")
-thresholds = {}
-threshold_types = {}
-for detection_type in selected_types:
-    threshold_types[detection_type] = st.sidebar.radio(f"{detection_type.capitalize()} Threshold Type", ["Manual", "Automatic"], key=f"{detection_type}_thresh_type")
-    if threshold_types[detection_type] == "Manual":
-        default = 0.5 if detection_type == 'sandboil' else 0.98 if detection_type == 'seepage' else 0.5
-        thresholds[detection_type] = st.sidebar.slider(f"{detection_type.capitalize()} Confidence Threshold", 0.0, 1.0, default, 0.01, key=f"{detection_type}_thresh")
-    else:
-        thresholds[detection_type] = None
+    st.markdown("---")
 
-# Other Settings
-distance_threshold = st.sidebar.slider("Distance Threshold Between Overlays (pixels)", 5, 100, 20)
-overlay_intensity = st.sidebar.slider("Overlay Intensity", 0.0, 1.0, 0.5)
-with st.sidebar.form("image_processing"):
-    st.write("### Customize Image Processing")
-    st.session_state['resolution_factor'] = st.slider("Resolution Scaling Factor", 0.1, 2.0, 1.0)
-    st.session_state['brightness_factor'] = st.slider("Brightness", -100, 100, 0)
-    st.session_state['contrast_factor'] = st.slider("Contrast", -100, 100, 0)
-    st.session_state['blur_amount'] = st.slider("Gaussian Blur (Kernel Size)", 1, 15, 1, step=2)
-    st.session_state['edge_detection'] = st.checkbox("Edge Detection (Canny)")
-    st.session_state['flip_horizontal'] = st.checkbox("Flip Horizontally")
-    st.session_state['flip_vertical'] = st.checkbox("Flip Vertically")
-    st.session_state['rotate_angle'] = st.slider("Rotate Image (Degrees)", -180, 180, 0)
-    st.form_submit_button("Apply")
+    detection_choice = st.radio("🖼️ Visualization Mode", ("Overlay", "Bounding Box"))
 
-# Legend
-st.sidebar.write("### Legend")
-legend_html = "".join([f"<span style='color:rgb{get_color_for_detection(t)}'>■ {t.capitalize()}</span><br>" for t in detection_types])
-st.sidebar.markdown(legend_html, unsafe_allow_html=True)
+    st.markdown("### 🎚 Threshold Settings")
+    thresholds = {}
+    threshold_types = {}
+    for detection_type in selected_types:
+        with st.expander(f"{detection_type.capitalize()} Threshold", expanded=False):
+            threshold_types[detection_type] = st.radio(
+                "Mode",
+                ["Manual", "Automatic"],
+                key=f"{detection_type}_thresh_type",
+                horizontal=True,
+            )
+            if threshold_types[detection_type] == "Manual":
+                default = 0.5 if detection_type == 'sandboil' else 0.98 if detection_type == 'seepage' else 0.5
+                thresholds[detection_type] = st.slider(
+                    "Confidence",
+                    0.0,
+                    1.0,
+                    default,
+                    0.01,
+                    key=f"{detection_type}_thresh"
+                )
+            else:
+                thresholds[detection_type] = None
 
-# Processing Choice
-processing_choice = st.radio("Choose Input Type", ("Image", "Video"))
+    distance_threshold = st.slider(
+        "Distance Threshold Between Overlays (px)",
+        5, 100, 20
+    )
+    overlay_intensity = st.slider("Overlay Intensity", 0.0, 1.0, 0.5)
+
+    # Image pre-processing form
+    with st.form("image_processing"):
+        st.markdown("### 🧮 Image Pre-processing")
+        st.session_state['resolution_factor'] = st.slider("Resolution Scaling Factor", 0.1, 2.0, 1.0)
+        st.session_state['brightness_factor'] = st.slider("Brightness", -100, 100, 0)
+        st.session_state['contrast_factor'] = st.slider("Contrast", -100, 100, 0)
+        st.session_state['blur_amount'] = st.slider("Gaussian Blur (Kernel Size)", 1, 15, 1, step=2)
+        st.session_state['edge_detection'] = st.checkbox("Edge Detection (Canny)")
+        st.session_state['flip_horizontal'] = st.checkbox("Flip Horizontally")
+        st.session_state['flip_vertical'] = st.checkbox("Flip Vertically")
+        st.session_state['rotate_angle'] = st.slider("Rotate Image (Degrees)", -180, 180, 0)
+        st.form_submit_button("Apply Pre-processing")
+
+    # Legend Card
+    legend_items = []
+    for t in detection_types:
+        rgb = get_color_for_detection(t)
+        legend_items.append(
+            f"<div style='display:flex;align-items:center;margin-bottom:4px;'>"
+            f"<div style='width:14px;height:14px;background-color:rgb{rgb};"
+            f"margin-right:6px;border-radius:3px;'></div>"
+            f"<span style='font-size:0.85rem;'>{t.capitalize()}</span>"
+            f"</div>"
+        )
+
+    legend_html = (
+        "<div style='padding:0.5rem 0.75rem;border-radius:0.5rem;"
+        "border:1px solid #e0e0e0;background-color:#fafafa;'>"
+        "<b>Legend</b><br>" + "".join(legend_items) + "</div>"
+    )
+    st.markdown(legend_html, unsafe_allow_html=True)
 
 # Load Models
+models = None
 if selected_types:
     models = load_selected_models(selected_types)
-if "save_success" not in st.session_state:
-    st.session_state.save_success = False
 
 # —— Session-state init ——
+if "save_success" not in st.session_state:
+    st.session_state.save_success = False
 if "canvas_counter" not in st.session_state:
     st.session_state.canvas_counter = 0
 if "annotations" not in st.session_state:
     st.session_state.annotations = []
 
 @st.cache_data(show_spinner=False)
-def get_cached_detection(image_array, selected_types, thresholds, threshold_types,
-                          detection_choice, overlay_intensity, distance_threshold):
+def get_cached_detection(
+    image_array,
+    selected_types,
+    thresholds,
+    threshold_types,
+    detection_choice,
+    overlay_intensity,
+    distance_threshold
+):
     return process_frame(
-        image_array, models, thresholds, threshold_types,
-        detection_choice, overlay_intensity, distance_threshold
+        image_array,
+        models,
+        thresholds,
+        threshold_types,
+        detection_choice,
+        overlay_intensity,
+        distance_threshold
     )
 
+# --- Tabs for Image / Video ---
+tab_image, tab_video = st.tabs(["🖼 Image Mode", "🎥 Video Mode"])
 
-
-# —— IMAGE PROCESSING BRANCH ——
-if processing_choice == "Image":
-    uploaded_image = st.file_uploader("Upload an Image", type=['jpg','png'])
+# —— IMAGE PROCESSING TAB ——
+with tab_image:
+    uploaded_image = st.file_uploader("Upload an Image", type=['jpg', 'png'])
     if not uploaded_image:
-        st.warning("Please upload an image to get started.")
+        st.info("Upload a levee image (JPG or PNG) to begin detection.")
     else:
-        # Decode & inference
-        img = cv2.imdecode(np.frombuffer(uploaded_image.read(), np.uint8), cv2.IMREAD_COLOR)
-        if not selected_types:
-            st.warning("Please select at least one detection type.")
-        else:
-            proc_img, pred_masks = get_cached_detection(
-                img, selected_types, thresholds, threshold_types,
-                detection_choice, overlay_intensity, distance_threshold
-            )
+        img_bytes = uploaded_image.read()
+        img = cv2.imdecode(np.frombuffer(img_bytes, np.uint8), cv2.IMREAD_COLOR)
 
-            # Show overlay + download
-            st.image(proc_img[..., ::-1], caption="Detection Results", use_container_width=True)
-            ret, buf = cv2.imencode('.png', proc_img)
-            if ret:
-                st.download_button("Download Processed Image", buf.tobytes(), "processed_image.png", "image/png")
+        if not selected_types:
+            st.warning("Please select at least one detection type from the sidebar.")
+        elif models is None:
+            st.error("Models could not be loaded. Check your model paths.")
+        else:
+            # Side-by-side: original vs processed
+            col1, col2 = st.columns(2)
+
+            with col1:
+                st.subheader("Original Image")
+                st.image(img[..., ::-1], use_container_width=True)
+
+            with col2:
+                st.subheader("Detection Results")
+                proc_img, pred_masks = get_cached_detection(
+                    img,
+                    selected_types,
+                    thresholds,
+                    threshold_types,
+                    detection_choice,
+                    overlay_intensity,
+                    distance_threshold
+                )
+                st.image(proc_img[..., ::-1], use_container_width=True)
+
+                # Download processed image
+                ret, buf = cv2.imencode('.png', proc_img)
+                if ret:
+                    st.download_button(
+                        "⬇️ Download Processed Image",
+                        buf.tobytes(),
+                        "processed_image.png",
+                        "image/png"
+                    )
 
             # Show masks
             with st.expander("Show Predicted Masks"):
@@ -383,9 +504,24 @@ if processing_choice == "Image":
             # Re-annotation toggle
             if st.checkbox("🖊️ Do you want to re-annotate this overlay?"):
                 st.markdown("### ✍️ Human-in-the-Loop Re-annotation")
-                target = st.selectbox("Which detection are you correcting?", [t.capitalize() for t in selected_types])
+                st.markdown(
+                    "<p style='font-size:0.9rem;color:gray;'>"
+                    "Correct model predictions by drawing polygons over the overlay. "
+                    "Double-click to close a polygon."
+                    "</p>",
+                    unsafe_allow_html=True,
+                )
+                target = st.selectbox(
+                    "Which detection are you correcting?",
+                    [t.capitalize() for t in selected_types]
+                )
 
-                # Delete Last / Clear All
+                # Controls for annotations
+                st.markdown(
+                    "<div style='padding:0.5rem;border-radius:0.5rem;"
+                    "border:1px solid #e0e0e0;background-color:#fcfcfc;'>",
+                    unsafe_allow_html=True,
+                )
                 c1, c2 = st.columns(2)
                 with c1:
                     if st.button("🗑️ Delete Last Annotation"):
@@ -396,33 +532,29 @@ if processing_choice == "Image":
                     if st.button("🗑️ Clear All Annotations"):
                         st.session_state.annotations = []
                         st.session_state.canvas_counter += 1
-
-                st.markdown("**Instructions:** Click to place points. **Double-click** to close the polygon. Use buttons above to delete.")
+                st.markdown("</div>", unsafe_allow_html=True)
 
                 # Prepare canvas
-                overlay = Image.fromarray(proc_img[..., ::-1])
+                overlay_pil = Image.fromarray(proc_img[..., ::-1])
                 max_w = 600
-                scale = min(1.0, max_w/overlay.width)
-                w, h = int(overlay.width*scale), int(overlay.height*scale)
+                scale = min(1.0, max_w / overlay_pil.width)
+                w, h = int(overlay_pil.width * scale), int(overlay_pil.height * scale)
 
-                # Always render the canvas
                 canvas_result = st_canvas(
-                    background_image=overlay,
+                    background_image=overlay_pil,
                     drawing_mode="polygon",
                     stroke_width=2,
                     stroke_color="#FF0000",
                     fill_color="rgba(255,0,0,0.2)",
-                    width=w, height=h,
+                    width=w,
+                    height=h,
                     key=f"canvas_{st.session_state.canvas_counter}",
-                    initial_drawing={"objects": st.session_state.annotations}
+                    initial_drawing={"objects": st.session_state.annotations},
                 )
 
-                # Grab shapes into session state
                 if canvas_result.json_data and "objects" in canvas_result.json_data:
                     st.session_state.annotations = canvas_result.json_data["objects"]
 
-
-                # Save Annotations button
                 if st.button("💾 Save Annotations"):
                     shapes = st.session_state.annotations
                     if not shapes:
@@ -450,13 +582,12 @@ if processing_choice == "Image":
 
                 if st.session_state.save_success:
                     st.success(f"✅ Saved {len(st.session_state.annotations)} annotation(s)!")
-                    # show and offer download
                     try:
                         with open("annotation_feedback.json", "r") as f:
                             saved_data = json.load(f)
                         st.json(saved_data)
                         st.download_button(
-                            "Download All Annotations",
+                            "⬇️ Download All Annotations",
                             json.dumps(saved_data, indent=2),
                             "annotation_feedback.json",
                             "application/json"
@@ -467,53 +598,79 @@ if processing_choice == "Image":
                     if st.button("Done Reviewing Saved Annotations"):
                         st.session_state.save_success = False
 
-
-
-
-                        
-                        
-# Video Processing
-if processing_choice == "Video":
+# —— VIDEO PROCESSING TAB ——
+with tab_video:
     uploaded_video = st.file_uploader("Upload a Video", type=["mp4", "avi", "mov"])
-    if uploaded_video:
+    if not uploaded_video:
+        st.info("Upload a video to run levee fault detection over time.")
+    else:
         tfile = tempfile.NamedTemporaryFile(delete=False)
         tfile.write(uploaded_video.read())
         tfile.flush()
         cap = cv2.VideoCapture(tfile.name)
         fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
         total_frames = cap.get(cv2.CAP_PROP_FRAME_COUNT)
-        video_duration = total_frames / fps
-        
-        timeline_offset = st.sidebar.slider("Start Time (seconds)", 0.0, video_duration, 0.0, 0.1)
+        video_duration = total_frames / fps if fps > 0 else 0
+
+        st.markdown("### 🎞 Video Playback Controls")
+        timeline_offset = st.slider(
+            "Start Time (seconds)",
+            0.0,
+            float(video_duration) if video_duration else 0.0,
+            0.0,
+            0.1
+        )
         cap.set(cv2.CAP_PROP_POS_MSEC, timeline_offset * 1000)
-        speed_multiplier = st.sidebar.slider("Playback Speed Multiplier", 0.5, 4.0, 1.0, 0.1)
-        real_time_playback = st.sidebar.checkbox("Real-time Playback", value=True)
-        
+
+        speed_multiplier = st.slider("Playback Speed Multiplier", 0.5, 4.0, 1.0, 0.1)
+        real_time_playback = st.checkbox("Real-time Playback", value=True)
+
         frame_placeholder = st.empty()
         processed_frames = []
         frame_delay = 0 if real_time_playback else 1.0 / (fps * speed_multiplier)
-        
-        while cap.isOpened():
-            start_time = time.time()
-            ret, frame = cap.read()
-            if not ret:
-                break
-            if selected_types:
-                processed_frame, _ = process_frame(frame, models, thresholds, threshold_types, detection_choice, overlay_intensity, distance_threshold)
-            else:
-                processed_frame = frame
-            processed_frames.append(processed_frame.copy())
-            frame_placeholder.image(processed_frame[..., ::-1], channels="RGB", use_container_width=True)
-            if frame_delay > 0:
-                elapsed = time.time() - start_time
-                sleep_time = frame_delay - elapsed
-                if sleep_time > 0:
-                    time.sleep(sleep_time)
-        
+
+        progress_bar = st.progress(0)
+        frame_counter = 0
+
+        if not selected_types or models is None:
+            st.warning("Select detection types in the sidebar to enable detection overlays.")
+        else:
+            while cap.isOpened():
+                start_time = time.time()
+                ret, frame = cap.read()
+                if not ret:
+                    break
+
+                processed_frame, _ = process_frame(
+                    frame,
+                    models,
+                    thresholds,
+                    threshold_types,
+                    detection_choice,
+                    overlay_intensity,
+                    distance_threshold
+                )
+                processed_frames.append(processed_frame.copy())
+                frame_placeholder.image(
+                    processed_frame[..., ::-1],
+                    channels="RGB",
+                    use_container_width=True
+                )
+
+                frame_counter += 1
+                if total_frames:
+                    progress_bar.progress(min(frame_counter / total_frames, 1.0))
+
+                if frame_delay > 0:
+                    elapsed = time.time() - start_time
+                    sleep_time = frame_delay - elapsed
+                    if sleep_time > 0:
+                        time.sleep(sleep_time)
+
         cap.release()
         os.remove(tfile.name)
-        
-        if processed_frames and selected_types:
+
+        if processed_frames and selected_types and models is not None:
             height, width = processed_frames[0].shape[:2]
             out_path = "processed_video.mp4"
             fourcc = cv2.VideoWriter_fourcc(*'mp4v')
@@ -521,8 +678,12 @@ if processing_choice == "Video":
             for frame in processed_frames:
                 writer.write(frame)
             writer.release()
+
             with open(out_path, 'rb') as f:
-                st.download_button("Download Processed Video", f.read(), "processed_video.mp4", "video/mp4")
+                st.download_button(
+                    "⬇️ Download Processed Video",
+                    f.read(),
+                    "processed_video.mp4",
+                    "video/mp4"
+                )
             os.remove(out_path)
-    else:
-        st.warning("Please upload a video.")
