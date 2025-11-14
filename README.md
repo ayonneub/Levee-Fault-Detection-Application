@@ -29,4 +29,4 @@ streamlit run FINAL.py
 ```
 
 The app will launch in your browser at http://localhost:8501. 
-### you can also use our web application: https://levee-fault-detection](https://levee-fault-detection.streamlit.app/
+### you can also use our web application: https://levee-fault-detection.streamlit.app/
