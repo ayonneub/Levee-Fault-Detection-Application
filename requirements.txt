@@ -12,6 +12,6 @@ matplotlib==3.9.3
 pillow==11.0.0
 opencv-python-headless==4.10.0.84
 
-# Deep learning (only if your app really uses TF models)
+# Deep learning
 tensorflow==2.15.0
 tensorflow-addons==0.23.0
