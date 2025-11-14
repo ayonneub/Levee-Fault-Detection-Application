@@ -3,7 +3,7 @@ streamlit==1.40.2
 streamlit-drawable-canvas==0.9.3
 
 # Numerics & data
-numpy==1.23.5
+numpy>=1.26.0
 pandas==2.2.3
 scipy==1.15.1
 
@@ -13,5 +13,5 @@ pillow==11.0.0
 opencv-python-headless==4.10.0.84
 
 # Deep learning (only if your app really uses TF models)
-tensorflow==2.11.1
-tensorflow-addons==0.20.0
+#tensorflow==2.11.1
+#tensorflow-addons==0.20.0
