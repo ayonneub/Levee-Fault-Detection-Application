@@ -23,7 +23,7 @@ st.set_page_config(
     page_icon="🌊",
     layout="wide",
 )
-
+'''
 st.markdown(
     """
     <style>
@@ -40,7 +40,7 @@ st.markdown(
     """,
     unsafe_allow_html=True,
 )
-
+'''
 # Import custom modules
 from metrics import (
     mcc_loss, mcc_metric, dice_coef, dice_loss, f1, tversky, tversky_loss,
