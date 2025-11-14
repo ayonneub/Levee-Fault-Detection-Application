@@ -23,24 +23,7 @@ st.set_page_config(
     page_icon="🌊",
     layout="wide",
 )
-'''
-st.markdown(
-    """
-    <style>
-    /* Sidebar background */
-    [data-testid="stSidebar"] {
-        background-color: #f8f9fa;
-    }
-    /* Reduce main padding a bit */
-    .block-container {
-        padding-top: 1rem;
-        padding-bottom: 1rem;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
-'''
+
 # Import custom modules
 from metrics import (
     mcc_loss, mcc_metric, dice_coef, dice_loss, f1, tversky, tversky_loss,
